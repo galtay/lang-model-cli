@@ -1,4 +1,5 @@
 from datetime import datetime
+import sqlite3
 import sys
 from typing import Annotated, Optional
 
@@ -46,6 +47,53 @@ def get_user_message_content(
     return msg
 
 
+def initialize_db(db_path: str):
+    """Initialize the SQLite database and create tables if they do not exist."""
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS completions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                start_dt TEXT,
+                end_dt TEXT,
+                prompt TEXT,
+                response TEXT,
+                model TEXT,
+                temperature REAL,
+                cost REAL,
+                duration REAL
+            )
+            """
+        )
+        conn.commit()
+
+
+def log_to_db(
+    db_path, start_dt, end_dt, prompt, response, model, temperature, cost, duration
+):
+    """Log response data to the database."""
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO completions (start_dt, end_dt, prompt, response, model, temperature, cost, duration)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                start_dt.isoformat(),
+                end_dt.isoformat(),
+                prompt,
+                response,
+                model,
+                temperature,
+                cost,
+                duration,
+            ),
+        )
+        conn.commit()
+
+
 @app.command()
 def main(
     prompt: Annotated[
@@ -62,6 +110,8 @@ def main(
     temperature: Annotated[
         float, typer.Option("--temperature", "-t", help="temperature")
     ] = 0.7,
+    user: Annotated[str, typer.Option(help="user name for logging")] = "default",
+    db_path: Annotated[str, typer.Option(help="path to sqlite db")] = "lmc_logs.db",
     piped_placeholder: Annotated[
         str, typer.Option(help="replace this string in prompt with piped input")
     ] = "@pipe",
@@ -69,7 +119,8 @@ def main(
         bool, typer.Option("--stream", "-s", help="stream results")
     ] = False,
     dryrun: Annotated[bool, typer.Option(help="dry run")] = False,
-    metrics: Annotated[bool, typer.Option(help="show metrics")] = False,
+    show_metrics: Annotated[bool, typer.Option(help="show metrics")] = False,
+    show_response: Annotated[bool, typer.Option(help="show full response")] = False,
 ):
     """Examples
 
@@ -83,6 +134,8 @@ def main(
 
     > cat <file_name> | lmc -p "Summarize the following text: @pipe"
     """
+
+    initialize_db(db_path)
 
     piped_text = get_piped_text()
     user_message_content = get_user_message_content(
@@ -113,28 +166,50 @@ def main(
                     print(delta, end="", flush=True)
         print()
         model_response = litellm.stream_chunk_builder(cached_chunks, messages=messages)
+        response_text = model_response.choices[0].message.content
 
     else:
 
         model_response = completion(
             model=model, messages=messages, temperature=temperature
         )
-        answer = model_response.choices[0].message.content
-        print(answer)
+        response_text = model_response.choices[0].message.content
+        print(response_text)
 
     end = datetime.now()
+    duration = end - start
+    if model.startswith("ollama"):
+        cost = 0
+    else:
+        cost = completion_cost(completion_response=model_response)
 
-    if metrics:
+    if show_response:
+        rich.print(model_response)
+
+    if show_metrics:
         table = Table()
         table.add_column("Start")
         table.add_column("End")
         table.add_column("Duration (s)")
         table.add_column("Cost")
-        cost = "${:,.5f}".format(completion_cost(completion_response=model_response))
-        duration = "{:,.2f}".format((end - start).total_seconds())
-        table.add_row(start.isoformat(), end.isoformat(), duration, cost)
+
+        duration_str = "{:,.2f}".format(duration.total_seconds())
+        cost_str = "${:,.5f}".format(cost)
+        table.add_row(start.isoformat(), end.isoformat(), duration_str, cost_str)
         console = Console()
         console.print(table)
+
+    log_to_db(
+        db_path,
+        start,
+        end,
+        prompt,
+        response_text,
+        model,
+        temperature,
+        cost,
+        duration.total_seconds(),
+    )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 [project]
 name = "lang-model-cli"
-version = "0.1.3"
+version = "0.1.4"
 description = "Language Model Command Line Interface"
 readme = "README.md"
 license = {file = "LICENSE"}

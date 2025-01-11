@@ -1,7 +1,7 @@
 [project]
 name = "lang-model-cli"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.1.2"
+description = "Language Model Command Line Interface"
 readme = "README.md"
 authors = [
     { name = "Gabriel Altay", email = "gabriel.altay@gmail.com" }
@@ -26,3 +26,8 @@ ipython = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "black>=24.10.0",
+]

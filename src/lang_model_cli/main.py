@@ -1,31 +1,67 @@
 import sys
 from typing import Annotated, Optional
 
-import typer
 import litellm
 from litellm import completion
+import rich
+import typer
 
 
-app = typer.Typer()
+app = typer.Typer(add_completion=False)
 
 
 @app.command()
 def main(
-    prompt: Annotated[str, typer.Argument(help="user message")] = None,
-    model: Annotated[str, typer.Argument(help="provider/model")] = "openai/gpt-4o-mini",
-    stream: Annotated[bool, typer.Option(help="stream results")] = False,
+    prompt: Annotated[
+        str,
+        typer.Option(
+            "--prompt",
+            "-p",
+            help="user message. @pipe will be replaced with piped input",
+        ),
+    ] = None,
+    model: Annotated[
+        str, typer.Option("--model", "-m", help="provider/model")
+    ] = "openai/gpt-4o-mini",
+    piped_placeholder: Annotated[
+        str, typer.Option(help="replace this string in prompt with piped input")
+    ] = "@pipe",
+    stream: Annotated[
+        bool, typer.Option("--stream", "-s", help="stream results")
+    ] = False,
+    dryrun: Annotated[bool, typer.Option(help="dry run")] = False,
 ):
     """
     Interact with language models.
     """
-    if not prompt and not sys.stdin.isatty():
-        # Read from stdin if no prompt is provided and input is piped
-        prompt = sys.stdin.read().strip()
-    elif not prompt:
-        typer.echo("Error: No prompt provided and no input piped.", err=True)
-        raise typer.Exit(code=1)
 
-    messages = [{"role": "user", "content": prompt}]
+    piped_text = None
+    if not sys.stdin.isatty():
+        piped_text = sys.stdin.read().strip()
+
+    if piped_text is None and prompt is None:
+        print("Error: No input piped and no prompt provided.")
+        raise typer.Exit(code=1)
+    elif piped_text is None and prompt is not None:
+        msg = prompt
+    elif piped_text is not None and prompt is None:
+        msg = piped_text
+    elif piped_text is not None and prompt is not None:
+        if piped_placeholder not in prompt:
+            print(
+                f"Error: Piped input provided but '{piped_placeholder}' "
+                "placeholder is missing from prompt."
+            )
+            raise typer.Exit(code=1)
+        else:
+            msg = prompt.replace(piped_placeholder, piped_text)
+            msg = msg.replace("\\n", "\n")
+
+    if dryrun:
+        rich.print(msg)
+        raise typer.Exit(code=0)
+
+    messages = [{"role": "user", "content": msg}]
 
     if stream:
 
@@ -39,15 +75,12 @@ def main(
                     print(delta, end="", flush=True)
         print()
         model_response = litellm.stream_chunk_builder(cached_chunks, messages=messages)
-        print(model_response)
-        print(model_response.model_dump())
 
     else:
 
-        response = completion(model=model, messages=messages)
-        answer = response.choices[0].message.content
+        model_response = completion(model=model, messages=messages)
+        answer = model_response.choices[0].message.content
         print(answer)
-
 
 
 if __name__ == "__main__":

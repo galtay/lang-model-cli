@@ -19,20 +19,49 @@ export ANTHROPIC_API_KEY="sk-..."
 
 ## Use the CLI
 
-You can construct user messages in several ways.
-
-Pass in a prompt directly,
+Full usage instructions can be viewed using,
 ```bash
-lmc -p hello
+lmc --help
 ```
 
-Pipe input in,
+Here are the basics.
+
+
+## user message with  `--prompt` or `-p`
+
+```bash
+lmc -p "briefly describe cosmology"
+```
+
+## stream output with  `--stream` or `-s`
+
+```bash
+lmc -p "briefly describe cosmology" -s
+```
+
+## system message with  `--system` or `-y`
+
+```bash
+lmc -p "briefly describe cosmology" -s -y "speak like a pirate"
+```
+
+## user message with pipe
+
 ```bash
 cat <filename> | lmc
 ```
 
-Or combine the two,
+If text is piped in and there is no `-p` option then the piped input will become the user message content.
+
+## user message with pipe and `-p`
+
 ```bash
-cat <filename> | lmc -p "Explain the following text: @pipe"
+cat <filename> | lmc -p "Summarize the following text: @pipe"
 ```
-Here `@pipe` will be replaced with the contents of `<filename>`.
+
+In this case, the `@pipe` string will be replaced with the piped in text.
+This could also be accomplished using [command substitution](https://www.gnu.org/software/bash/manual/html_node/Command-Substitution.html),
+
+```bash
+lmc -p "Summarize the following text: $(cat <filename>)"
+```

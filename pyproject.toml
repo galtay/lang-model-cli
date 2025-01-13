@@ -1,6 +1,6 @@
 [project]
 name = "lang-model-cli"
-version = "0.1.4"
+version = "0.1.5"
 description = "Language Model Command Line Interface"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -19,8 +19,8 @@ dependencies = [
 repository = "https://github.com/galtay/lang-model-cli"
 
 [project.scripts]
-lang-model-cli = "lang_model_cli.main:app"
-lmc = "lang_model_cli.main:app"
+lang-model-cli = "lang_model_cli.main:main"
+lmc = "lang_model_cli.main:main"
 
 [project.optional-dependencies]
 ipython = [

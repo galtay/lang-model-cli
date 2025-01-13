@@ -97,11 +97,19 @@ def log_to_db(
 @app.command()
 def main(
     prompt: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--prompt",
             "-p",
             help="user message. @pipe will be replaced with piped input",
+        ),
+    ] = None,
+    system: Annotated[
+        str | None,
+        typer.Option(
+            "--system",
+            "-y",
+            help="system message",
         ),
     ] = None,
     model: Annotated[
@@ -142,13 +150,17 @@ def main(
         prompt, piped_text, piped_placeholder
     )
 
+    messages = []
+    if system is not None:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": user_message_content})
+
     if dryrun:
         rich.print(f"piped_text={piped_text}")
         rich.print(f"prompt={prompt}")
-        rich.print(f"user_message_content={user_message_content}")
+        rich.print(f"system={system}")
+        rich.print(f"messages={messages}")
         raise typer.Exit(code=0)
-
-    messages = [{"role": "user", "content": user_message_content}]
 
     start = datetime.now()
 
@@ -212,5 +224,9 @@ def main(
     )
 
 
-if __name__ == "__main__":
+def main():
     app()
+
+
+if __name__ == "__main__":
+    main()
